@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Les icônes de la notification de lecture (▶ ⏸ ⏭ …) sont cherchées par leur
+     nom pendant l'exécution : sans ce fichier, la compilation finale les retire
+     et la lecture plante dès qu'on lance une chanson. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/*,@mipmap/ic_launcher" />
