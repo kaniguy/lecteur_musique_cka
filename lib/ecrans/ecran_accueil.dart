@@ -11,6 +11,7 @@ import '../widgets/mini_lecteur.dart';
 import '../widgets/pochette.dart';
 import '../widgets/tuile_chanson.dart';
 import 'ecran_collection.dart';
+import 'ecran_doublons.dart';
 import 'onglets_ecoutes.dart';
 
 /// Clé où l'on garde le dernier tri choisi d'une ouverture à l'autre.
@@ -162,6 +163,13 @@ class _EcranAccueilState extends State<EcranAccueil>
           icon: const Icon(Icons.search_rounded),
           onPressed: () =>
               showSearch(context: context, delegate: _Recherche(chansons)),
+        ),
+        IconButton(
+          tooltip: 'Doublons',
+          icon: const Icon(Icons.content_copy_rounded),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const EcranDoublons()),
+          ),
         ),
         MenuTri(tri: _tri, onChoisi: _choisirTri),
       ],

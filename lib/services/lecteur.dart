@@ -168,6 +168,28 @@ class Lecteur extends ChangeNotifier {
   Future<int> supprimerDuTelephone(Iterable<Chanson> chansons) async {
     final effaces = await bibliotheque.supprimer(chansons.map((c) => c.id));
     if (effaces.isEmpty) return 0;
+    await _retirerEffaces(effaces);
+    return effaces.length;
+  }
+
+  /// Fusionne des doublons : efface chaque copie (clé) du téléphone après
+  /// avoir passé à la chanson gardée (valeur) ses écoutes, son favori, sa
+  /// place dans les playlists et ses moments marqués.
+  /// Android demande confirmation une seule fois. Renvoie le nombre effacé.
+  Future<int> fusionnerDoublons(Map<int, int> copieVersGardee) async {
+    final effaces = await bibliotheque.supprimer(copieVersGardee.keys);
+    if (effaces.isEmpty) return 0;
+    final fusion = {for (final id in effaces) id: copieVersGardee[id]!};
+    for (final MapEntry(key: copie, value: gardee) in fusion.entries) {
+      if (_favoris.contains(copie)) _favoris.add(gardee);
+    }
+    await memoire.fusionner(fusion);
+    await _retirerEffaces(effaces);
+    return effaces.length;
+  }
+
+  /// Retire de partout des chansons qui viennent d'être effacées.
+  Future<void> _retirerEffaces(Set<int> effaces) async {
     // Retire les titres effacés de la file, en partant de la fin.
     for (var i = _file.length - 1; i >= 0; i--) {
       if (!effaces.contains(_file[i].id)) continue;
@@ -188,7 +210,6 @@ class Lecteur extends ChangeNotifier {
     await memoire.oublier(effaces);
     _appliquerModifs();
     unawaited(_sauverFile());
-    return effaces.length;
   }
 
   /// Met (ou retire) toutes ces chansons en favori.

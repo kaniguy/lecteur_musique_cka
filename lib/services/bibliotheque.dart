@@ -63,6 +63,54 @@ class Bibliotheque {
     return {for (final id in effaces ?? <num>[]) id.toInt()};
   }
 
+  /// Les fichiers en double (contenu identique), par groupes d'au moins 2.
+  Future<List<List<FichierDouble>>> doublons() async {
+    final groupes = await _canal.invokeListMethod<List<Object?>>('doublons');
+    return [
+      for (final g in groupes ?? <List<Object?>>[])
+        [
+          for (final f in g)
+            FichierDouble.depuisMap(f! as Map<Object?, Object?>),
+        ],
+    ];
+  }
+
   /// La pochette si elle est déjà chargée, sans attendre.
   String? pochetteConnue(Chanson c) => _connues[c.albumId];
+}
+
+/// Un fichier d'un groupe de doublons.
+class FichierDouble {
+  const FichierDouble({
+    required this.id,
+    required this.fichier,
+    required this.dossier,
+    required this.taille,
+    required this.ajout,
+  });
+
+  factory FichierDouble.depuisMap(Map<Object?, Object?> m) => FichierDouble(
+    id: (m['id'] as num).toInt(),
+    fichier: m['fichier'] as String? ?? '',
+    dossier: m['dossier'] as String? ?? '',
+    taille: (m['taille'] as num? ?? 0).toInt(),
+    ajout: DateTime.fromMillisecondsSinceEpoch(
+      (m['ajout'] as num? ?? 0).toInt() * 1000,
+    ),
+  );
+
+  final int id;
+
+  /// Nom du fichier, par ex. « BALAFON DE … A TALERE-1.mp3 ».
+  final String fichier;
+
+  /// Dossier du fichier, par ex. « Xender/audio/ ».
+  final String dossier;
+
+  /// Taille en octets.
+  final int taille;
+  final DateTime ajout;
+
+  /// Une copie faite par Android ou Xender : « titre-1.mp3 », « titre (2).mp3 ».
+  bool get estCopie => RegExp(r'(-\d+|\s*\(\d+\))\.\w+$').hasMatch(fichier);
 }

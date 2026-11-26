@@ -95,17 +95,25 @@ class MenuTri extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<Tri>(
-      tooltip: 'Trier',
-      icon: const Icon(Icons.sort_rounded),
-      initialValue: tri,
-      onSelected: onChoisi,
-      itemBuilder: (_) => [
+    // MenuAnchor plutôt que PopupMenuButton : le menu ne bloque pas l'écran.
+    // Toucher ailleurs le ferme ET agit tout de suite (défiler, ouvrir…).
+    return MenuAnchor(
+      builder: (context, menu, _) => IconButton(
+        tooltip: 'Trier',
+        icon: const Icon(Icons.sort_rounded),
+        onPressed: () => menu.isOpen ? menu.close() : menu.open(),
+      ),
+      menuChildren: [
         for (final MapEntry(key: t, value: (icone, texte)) in _choix.entries)
           if (t != Tri.ordrePlaylist || avecOrdrePlaylist)
-            PopupMenuItem(
-              value: t,
-              child: ListTile(leading: Icon(icone), title: Text(texte)),
+            MenuItemButton(
+              leadingIcon: Icon(icone),
+              trailingIcon: t == tri ? const Icon(Icons.check_rounded) : null,
+              onPressed: () => onChoisi(t),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(texte),
+              ),
             ),
       ],
     );

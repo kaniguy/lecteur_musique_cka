@@ -17,7 +17,9 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 /**
@@ -56,6 +58,14 @@ class MainActivity : AudioServiceActivity() {
                             emptyList()
                         }
                         runOnUiThread { resultat.success(chansons) }
+                    }
+                    "doublons" -> executeur.execute {
+                        val groupes = try {
+                            doublons()
+                        } catch (e: Exception) {
+                            emptyList()
+                        }
+                        runOnUiThread { resultat.success(groupes) }
                     }
                     "partager" -> {
                         val ids = appel.argument<List<Number>>("ids")!!.map { it.toLong() }
@@ -303,6 +313,81 @@ class MainActivity : AudioServiceActivity() {
             }
         }
         return chansons
+    }
+
+    /**
+     * Les fichiers en double : mêmes taille et durée, puis même empreinte
+     * (début et fin du fichier). Chaque groupe contient au moins 2 fichiers.
+     */
+    private fun doublons(): List<List<Map<String, Any?>>> {
+        val colonnes = mutableListOf(
+            MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.SIZE,
+            MediaStore.Audio.Media.DURATION,
+            MediaStore.Audio.Media.DISPLAY_NAME,
+            MediaStore.Audio.Media.DATE_ADDED,
+        )
+        if (Build.VERSION.SDK_INT >= 29) colonnes.add(MediaStore.Audio.Media.RELATIVE_PATH)
+        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND " +
+            "${MediaStore.Audio.Media.DURATION} >= 30000 AND " +
+            "${MediaStore.Audio.Media.SIZE} > 0"
+        // Regroupe d'abord par taille et durée (à la seconde près).
+        val candidats = mutableMapOf<String, MutableList<Map<String, Any?>>>()
+        contentResolver.query(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            colonnes.toTypedArray(),
+            selection,
+            null,
+            null,
+        )?.use { c ->
+            val iDossier = c.getColumnIndex("relative_path")
+            while (c.moveToNext()) {
+                val taille = c.getLong(1)
+                val cle = "$taille/${c.getLong(2) / 1000}"
+                candidats.getOrPut(cle) { mutableListOf() }.add(
+                    mapOf(
+                        "id" to c.getLong(0),
+                        "taille" to taille,
+                        "fichier" to c.getString(3),
+                        "ajout" to c.getLong(4),
+                        "dossier" to if (iDossier >= 0) c.getString(iDossier) else null,
+                    ),
+                )
+            }
+        }
+        // Puis vérifie le contenu, pour ne jamais confondre deux enregistrements.
+        val groupes = mutableListOf<List<Map<String, Any?>>>()
+        for (liste in candidats.values) {
+            if (liste.size < 2) continue
+            liste.groupBy { empreinte(it["id"] as Long, it["taille"] as Long) }
+                .filterKeys { it != null }
+                .values
+                .filter { it.size >= 2 }
+                .forEach(groupes::add)
+        }
+        return groupes
+    }
+
+    /** Empreinte du début et de la fin du fichier (256 Ko de chaque côté). */
+    private fun empreinte(id: Long, taille: Long): String? = try {
+        val bloc = 256 * 1024
+        val md5 = MessageDigest.getInstance("MD5")
+        contentResolver.openFileDescriptor(uriDe(id), "r")?.use { pfd ->
+            FileInputStream(pfd.fileDescriptor).use { flux ->
+                val canal = flux.channel
+                val tampon = java.nio.ByteBuffer.allocate(bloc)
+                for (debut in listOf(0L, maxOf(0L, taille - bloc))) {
+                    tampon.clear()
+                    canal.position(debut)
+                    while (tampon.hasRemaining() && canal.read(tampon) > 0) Unit
+                    tampon.flip()
+                    md5.update(tampon)
+                }
+            }
+            md5.digest().joinToString("") { "%02x".format(it) }
+        }
+    } catch (e: Exception) {
+        null
     }
 
     /** Informations détaillées d'une chanson : fichier, format, taille, débit… */

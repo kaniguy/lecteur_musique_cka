@@ -117,6 +117,15 @@ ThemeData themeCka() {
       shape: arrondi,
       elevation: 8,
     ),
+    // Le menu « Trier » (MenuAnchor) a le même aspect que les autres menus.
+    menuTheme: MenuThemeData(
+      style: MenuStyle(
+        backgroundColor: const WidgetStatePropertyAll(surfaceHaute),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        shape: WidgetStatePropertyAll(arrondi),
+        elevation: const WidgetStatePropertyAll(8),
+      ),
+    ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: surfaceHaute,

@@ -242,6 +242,61 @@ class Memoire extends ChangeNotifier {
     );
   }
 
+  // ---------- Doublons ----------
+
+  /// Fusionne des doublons : tout ce qui est retenu sur chaque copie (clé)
+  /// passe à la chanson gardée (valeur). Écoutes additionnées, place dans les
+  /// playlists et dans les récents, moments marqués, infos modifiées.
+  /// Les copies sont ensuite à effacer avec [oublier].
+  Future<void> fusionner(Map<int, int> copieVersGardee) async {
+    int vers(int id) => copieVersGardee[id] ?? id;
+
+    List<int> remplacer(List<int> ids) {
+      final vus = <int>{};
+      return [
+        for (final id in ids)
+          if (vus.add(vers(id))) vers(id),
+      ];
+    }
+
+    for (final p in _playlists) {
+      final nouvelles = remplacer(p.chansons);
+      p.chansons
+        ..clear()
+        ..addAll(nouvelles);
+    }
+    final recents = remplacer(_recents);
+    _recents
+      ..clear()
+      ..addAll(recents);
+    for (final MapEntry(key: copie, value: gardee) in copieVersGardee.entries) {
+      final n = _ecoutes.remove(copie);
+      if (n != null) _ecoutes[gardee] = ecoutes(gardee) + n;
+      final modif = _modifs.remove(copie);
+      if (modif != null) _modifs.putIfAbsent(gardee, () => modif);
+      final marques = _marques.remove(copie);
+      if (marques != null) {
+        final liste = _marques.putIfAbsent(gardee, () => []);
+        for (final m in marques) {
+          final proche = liste.any(
+            (x) => (x.position - m.position).inMilliseconds.abs() < 1000,
+          );
+          if (!proche) liste.add(m);
+        }
+        liste.sort((a, b) => a.position.compareTo(b.position));
+      }
+    }
+    await _sauverPlaylists();
+    await _sauverModifs();
+    await _sauverMarques();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'ecoutes',
+      jsonEncode({for (final e in _ecoutes.entries) '${e.key}': e.value}),
+    );
+    await prefs.setStringList('recents', [for (final id in _recents) '$id']);
+  }
+
   /// Oublie tout ce qui concerne des chansons effacées du téléphone.
   Future<void> oublier(Set<int> ids) async {
     for (final p in _playlists) {
